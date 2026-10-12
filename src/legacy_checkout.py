@@ -2,6 +2,41 @@
 
 ORDERS_PROCESSED = []
 
+CUSTOMER_VIP = "vip"
+CUSTOMER_EMPLOYEE = "employee"
+CUSTOMER_REGULAR = "regular"
+
+COUPON_PROMO10 = "PROMO10"
+COUPON_PROMO20 = "PROMO20"
+COUPON_VIP50 = "VIP50"
+
+VIP_HIGH_DISCOUNT_THRESHOLD = 1000
+VIP_HIGH_DISCOUNT_RATE = 0.15
+VIP_BASE_DISCOUNT_RATE = 0.10
+EMPLOYEE_DISCOUNT_RATE = 0.20
+REGULAR_DISCOUNT_THRESHOLD = 800
+REGULAR_DISCOUNT_RATE = 0.05
+
+PROMO10_RATE = 0.10
+PROMO20_RATE = 0.20
+PROMO20_MIN_SUBTOTAL = 500
+VIP50_FIXED_DISCOUNT = 50
+MAX_DISCOUNT_RATE = 0.25
+
+FREE_SHIPPING_MIN_SUBTOTAL = 500
+SOUTHEAST_STATES = {"MG", "SP", "RJ", "ES"}
+SOUTHEAST_BASE_SHIPPING = 20
+SOUTHEAST_SHIPPING_PER_KG = 0.4
+OTHER_BASE_SHIPPING = 35
+OTHER_SHIPPING_PER_KG = 0.6
+EXPRESS_SHIPPING_MULTIPLIER = 1.8
+
+TAX_RATES = {"MG": 0.07, "SP": 0.09, "RJ": 0.08, "ES": 0.07}
+DEFAULT_TAX_RATE = 0.12
+
+VIP_POINTS_DIVISOR = 5
+DEFAULT_POINTS_DIVISOR = 10
+
 
 def process_order(customer, items, coupon="", state="MG", express=False):
 
@@ -14,32 +49,32 @@ def process_order(customer, items, coupon="", state="MG", express=False):
     desconto = 0
 
     # desconto por tipo de cliente
-    if customer["type"] == "vip":
-        if subtotal >= 1000:
-            desconto = subtotal * 0.15
+    if customer["type"] == CUSTOMER_VIP:
+        if subtotal >= VIP_HIGH_DISCOUNT_THRESHOLD:
+            desconto = subtotal * VIP_HIGH_DISCOUNT_RATE
         else:
-            desconto = subtotal * 0.10
+            desconto = subtotal * VIP_BASE_DISCOUNT_RATE
     else:
-        if customer["type"] == "employee":
-            desconto = subtotal * 0.20
+        if customer["type"] == CUSTOMER_EMPLOYEE:
+            desconto = subtotal * EMPLOYEE_DISCOUNT_RATE
         else:
-            if customer["type"] == "regular":
-                if subtotal >= 800:
-                    desconto = subtotal * 0.05
+            if customer["type"] == CUSTOMER_REGULAR:
+                if subtotal >= REGULAR_DISCOUNT_THRESHOLD:
+                    desconto = subtotal * REGULAR_DISCOUNT_RATE
 
     # cupons
-    if coupon == "PROMO10":
-        desconto = desconto + subtotal * 0.10
+    if coupon == COUPON_PROMO10:
+        desconto = desconto + subtotal * PROMO10_RATE
 
-    if coupon == "PROMO20" and subtotal >= 500:
-        desconto = desconto + subtotal * 0.20
+    if coupon == COUPON_PROMO20 and subtotal >= PROMO20_MIN_SUBTOTAL:
+        desconto = desconto + subtotal * PROMO20_RATE
 
-    if coupon == "VIP50" and customer["type"] == "vip":
-        desconto = desconto + 50
+    if coupon == COUPON_VIP50 and customer["type"] == CUSTOMER_VIP:
+        desconto = desconto + VIP50_FIXED_DISCOUNT
 
     # desconto máximo permitido
-    if desconto > subtotal * 0.25:
-        desconto = subtotal * 0.25
+    if desconto > subtotal * MAX_DISCOUNT_RATE:
+        desconto = subtotal * MAX_DISCOUNT_RATE
 
     valor_com_desconto = subtotal - desconto
 
@@ -51,40 +86,29 @@ def process_order(customer, items, coupon="", state="MG", express=False):
     # frete
     frete = 0
 
-    if subtotal >= 500 and not express:
+    if subtotal >= FREE_SHIPPING_MIN_SUBTOTAL and not express:
         frete = 0
     else:
-        if state in {"MG", "SP", "RJ", "ES"}:
-            frete = 20 + peso * 0.4
+        if state in SOUTHEAST_STATES:
+            frete = SOUTHEAST_BASE_SHIPPING + peso * SOUTHEAST_SHIPPING_PER_KG
         else:
-            frete = 35 + peso * 0.6
+            frete = OTHER_BASE_SHIPPING + peso * OTHER_SHIPPING_PER_KG
 
         if express:
-            frete = frete * 1.8
+            frete = frete * EXPRESS_SHIPPING_MULTIPLIER
 
     # impostos
-    taxa = 0
-
-    if state == "MG":
-        taxa = 0.07
-    elif state == "SP":
-        taxa = 0.09
-    elif state == "RJ":
-        taxa = 0.08
-    elif state == "ES":
-        taxa = 0.07
-    else:
-        taxa = 0.12
+    taxa = TAX_RATES.get(state, DEFAULT_TAX_RATE)
 
     imposto = valor_com_desconto * taxa
 
     # pontos de fidelidade
     pontos = 0
 
-    if customer["type"] == "vip":
-        pontos = int((valor_com_desconto + frete + imposto) / 5)
+    if customer["type"] == CUSTOMER_VIP:
+        pontos = int((valor_com_desconto + frete + imposto) / VIP_POINTS_DIVISOR)
     else:
-        pontos = int((valor_com_desconto + frete + imposto) / 10)
+        pontos = int((valor_com_desconto + frete + imposto) / DEFAULT_POINTS_DIVISOR)
 
     # procura produtos repetidos de forma bem pouco elegante
     duplicados = []
