@@ -6,12 +6,6 @@ ORDERS_PROCESSED = []
 def process_order(customer, items, coupon="", state="MG", express=False):
 
     # cálculo do subtotal
-    total1 = 0
-    for x in items:
-        if x["qty"] > 0:
-            total1 = total1 + (x["price"] * x["qty"])
-
-    # alguém colocou outro cálculo porque não confiava no primeiro
     subtotal = 0
     for x in items:
         if x["qty"] > 0:
@@ -57,15 +51,15 @@ def process_order(customer, items, coupon="", state="MG", express=False):
     # frete
     frete = 0
 
-    if subtotal >= 500 and express == False:
+    if subtotal >= 500 and not express:
         frete = 0
     else:
-        if state == "MG" or state == "SP" or state == "RJ" or state == "ES":
+        if state in {"MG", "SP", "RJ", "ES"}:
             frete = 20 + peso * 0.4
         else:
             frete = 35 + peso * 0.6
 
-        if express == True:
+        if express:
             frete = frete * 1.8
 
     # impostos
