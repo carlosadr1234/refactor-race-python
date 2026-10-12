@@ -1,4 +1,9 @@
-# legacy_checkout.py
+"""Processamento de pedidos.
+
+Versão refatorada do sistema legado. O módulo mantém o nome ``legacy_checkout``
+para preservar a interface usada pelos testes; o comportamento de
+``process_order`` não foi alterado.
+"""
 
 from collections import Counter
 
@@ -42,6 +47,9 @@ DEFAULT_POINTS_DIVISOR = 10
 
 def calculate_subtotal(items):
     """Soma preço x quantidade dos itens com quantidade positiva."""
+    # Laço explícito (e não sum()) para manter exatamente a mesma soma de
+    # ponto flutuante do código original: sum() de floats usa soma compensada
+    # no Python 3.12+ e poderia mudar centavos.
     subtotal = 0
     for item in items:
         if item["qty"] > 0:
@@ -94,65 +102,68 @@ def calculate_discount(customer_type, coupon, subtotal):
     return min(discount, subtotal * MAX_DISCOUNT_RATE)
 
 
+def calculate_shipping(subtotal, total_weight, state, express):
+    """Frete: grátis a partir de 500 (exceto expresso), senão base + peso."""
+    if subtotal >= FREE_SHIPPING_MIN_SUBTOTAL and not express:
+        return 0
+
+    if state in SOUTHEAST_STATES:
+        shipping = SOUTHEAST_BASE_SHIPPING + total_weight * SOUTHEAST_SHIPPING_PER_KG
+    else:
+        shipping = OTHER_BASE_SHIPPING + total_weight * OTHER_SHIPPING_PER_KG
+
+    if express:
+        shipping = shipping * EXPRESS_SHIPPING_MULTIPLIER
+    return shipping
+
+
+def get_tax_rate(state):
+    """Alíquota do estado (estados sem alíquota própria usam a padrão)."""
+    return TAX_RATES.get(state, DEFAULT_TAX_RATE)
+
+
+def calculate_loyalty_points(customer_type, amount_due):
+    """Pontos sobre o valor ainda não arredondado (VIP ganha mais)."""
+    if customer_type == CUSTOMER_VIP:
+        return int(amount_due / VIP_POINTS_DIVISOR)
+    return int(amount_due / DEFAULT_POINTS_DIVISOR)
+
+
+def print_order_summary(customer_name, subtotal, discount, shipping, tax, total):
+    print("Pedido processado para " + customer_name)
+    print("Subtotal:", subtotal)
+    print("Desconto:", discount)
+    print("Frete:", shipping)
+    print("Imposto:", tax)
+    print("TOTAL:", total)
+
+
 def process_order(customer, items, coupon="", state="MG", express=False):
+    customer_type = customer["type"]
 
     subtotal = calculate_subtotal(items)
+    discount = calculate_discount(customer_type, coupon, subtotal)
+    discounted_value = subtotal - discount
 
-    desconto = calculate_discount(customer["type"], coupon, subtotal)
+    shipping = calculate_shipping(
+        subtotal, calculate_total_weight(items), state, express
+    )
+    tax = discounted_value * get_tax_rate(state)
+    amount_due = discounted_value + shipping + tax
+    total = round(amount_due, 2)
 
-    valor_com_desconto = subtotal - desconto
-
-    peso = calculate_total_weight(items)
-
-    # frete
-    frete = 0
-
-    if subtotal >= FREE_SHIPPING_MIN_SUBTOTAL and not express:
-        frete = 0
-    else:
-        if state in SOUTHEAST_STATES:
-            frete = SOUTHEAST_BASE_SHIPPING + peso * SOUTHEAST_SHIPPING_PER_KG
-        else:
-            frete = OTHER_BASE_SHIPPING + peso * OTHER_SHIPPING_PER_KG
-
-        if express:
-            frete = frete * EXPRESS_SHIPPING_MULTIPLIER
-
-    # impostos
-    taxa = TAX_RATES.get(state, DEFAULT_TAX_RATE)
-
-    imposto = valor_com_desconto * taxa
-
-    # pontos de fidelidade
-    pontos = 0
-
-    if customer["type"] == CUSTOMER_VIP:
-        pontos = int((valor_com_desconto + frete + imposto) / VIP_POINTS_DIVISOR)
-    else:
-        pontos = int((valor_com_desconto + frete + imposto) / DEFAULT_POINTS_DIVISOR)
-
-    duplicados = find_duplicate_products(items)
-
-    total_final = round(valor_com_desconto + frete + imposto, 2)
-
-    resultado = {
+    result = {
         "customer": customer["name"],
         "subtotal": round(subtotal, 2),
-        "discount": round(desconto, 2),
-        "shipping": round(frete, 2),
-        "tax": round(imposto, 2),
-        "total": total_final,
-        "points": pontos,
-        "duplicate_products": duplicados
+        "discount": round(discount, 2),
+        "shipping": round(shipping, 2),
+        "tax": round(tax, 2),
+        "total": total,
+        "points": calculate_loyalty_points(customer_type, amount_due),
+        "duplicate_products": find_duplicate_products(items),
     }
 
-    ORDERS_PROCESSED.append(resultado)
+    ORDERS_PROCESSED.append(result)
+    print_order_summary(customer["name"], subtotal, discount, shipping, tax, total)
 
-    print("Pedido processado para " + customer["name"])
-    print("Subtotal:", subtotal)
-    print("Desconto:", desconto)
-    print("Frete:", frete)
-    print("Imposto:", imposto)
-    print("TOTAL:", total_final)
-
-    return resultado
+    return result
