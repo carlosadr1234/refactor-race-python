@@ -3,8 +3,6 @@
 ## EQUIPE
 
 - Carlos
-- Integrante 2
-- Integrante 3
 
 ## DESCRIÇÃO
 
