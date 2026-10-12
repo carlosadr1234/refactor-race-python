@@ -63,39 +63,42 @@ def find_duplicate_products(items):
     return [name for name, count in name_counts.items() if count > 1]
 
 
+def calculate_customer_discount(customer_type, subtotal):
+    """Desconto pelo tipo de cliente."""
+    if customer_type == CUSTOMER_VIP:
+        if subtotal >= VIP_HIGH_DISCOUNT_THRESHOLD:
+            return subtotal * VIP_HIGH_DISCOUNT_RATE
+        return subtotal * VIP_BASE_DISCOUNT_RATE
+    if customer_type == CUSTOMER_EMPLOYEE:
+        return subtotal * EMPLOYEE_DISCOUNT_RATE
+    if customer_type == CUSTOMER_REGULAR and subtotal >= REGULAR_DISCOUNT_THRESHOLD:
+        return subtotal * REGULAR_DISCOUNT_RATE
+    return 0
+
+
+def calculate_coupon_discount(coupon, customer_type, subtotal):
+    """Desconto do cupom informado (cupom desconhecido não dá desconto)."""
+    if coupon == COUPON_PROMO10:
+        return subtotal * PROMO10_RATE
+    if coupon == COUPON_PROMO20 and subtotal >= PROMO20_MIN_SUBTOTAL:
+        return subtotal * PROMO20_RATE
+    if coupon == COUPON_VIP50 and customer_type == CUSTOMER_VIP:
+        return VIP50_FIXED_DISCOUNT
+    return 0
+
+
+def calculate_discount(customer_type, coupon, subtotal):
+    """Desconto total, limitado a 25% do subtotal."""
+    discount = calculate_customer_discount(customer_type, subtotal)
+    discount += calculate_coupon_discount(coupon, customer_type, subtotal)
+    return min(discount, subtotal * MAX_DISCOUNT_RATE)
+
+
 def process_order(customer, items, coupon="", state="MG", express=False):
 
     subtotal = calculate_subtotal(items)
 
-    desconto = 0
-
-    # desconto por tipo de cliente
-    if customer["type"] == CUSTOMER_VIP:
-        if subtotal >= VIP_HIGH_DISCOUNT_THRESHOLD:
-            desconto = subtotal * VIP_HIGH_DISCOUNT_RATE
-        else:
-            desconto = subtotal * VIP_BASE_DISCOUNT_RATE
-    else:
-        if customer["type"] == CUSTOMER_EMPLOYEE:
-            desconto = subtotal * EMPLOYEE_DISCOUNT_RATE
-        else:
-            if customer["type"] == CUSTOMER_REGULAR:
-                if subtotal >= REGULAR_DISCOUNT_THRESHOLD:
-                    desconto = subtotal * REGULAR_DISCOUNT_RATE
-
-    # cupons
-    if coupon == COUPON_PROMO10:
-        desconto = desconto + subtotal * PROMO10_RATE
-
-    if coupon == COUPON_PROMO20 and subtotal >= PROMO20_MIN_SUBTOTAL:
-        desconto = desconto + subtotal * PROMO20_RATE
-
-    if coupon == COUPON_VIP50 and customer["type"] == CUSTOMER_VIP:
-        desconto = desconto + VIP50_FIXED_DISCOUNT
-
-    # desconto máximo permitido
-    if desconto > subtotal * MAX_DISCOUNT_RATE:
-        desconto = subtotal * MAX_DISCOUNT_RATE
+    desconto = calculate_discount(customer["type"], coupon, subtotal)
 
     valor_com_desconto = subtotal - desconto
 
