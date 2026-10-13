@@ -2,7 +2,7 @@
 
 ## EQUIPE
 
-- Carlos
+- Carlos Adriano
 
 ## DESCRIÇÃO
 
